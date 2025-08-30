@@ -1,0 +1,319 @@
+"use client";
+import React, { useEffect, useMemo, useState } from "react";
+
+/**
+ * NEXT.JS MOBILE RASHI CHART + DRISHTI HIGHLIGHTS
+ * -------------------------------------------------
+ * What this provides (drop-in page component):
+ * 1) A mobile-friendly Vedic (sidereal) Rashi chart grid showing planets by sign & degree.
+ * 2) Planet selector that highlights its special Vedic aspects (drishti) as 30° arcs (house-wide):
+ *    - Sun: 7th
+ *    - Moon: 7th
+ *    - Mercury: 7th
+ *    - Venus: 7th
+ *    - Mars: 4th, 7th, 8th
+ *    - Jupiter: 5th, 7th, 9th
+ *    - Saturn: 3rd, 7th, 10th
+ *    - Rahu: 5th, 7th, 9th (traditional)
+ *    - Ketu: 5th, 7th, 9th (traditional)
+ * 3) Exact textual ranges like your example (e.g., “19° Sagittarius → 18° Capricorn”).
+ *
+ * How to use in a Next.js App Router project:
+ * ------------------------------------------
+ * 1) Create a file: app/page.tsx and paste this component content, or import and render <RashiDrishti />.
+ * 2) Ensure Tailwind is enabled (npx tailwindcss init -p) and container padding set for mobile.
+ * 3) Replace the "fetchPositions" function with a real API:
+ *    - Recommended: Prokerala Astrology API (sidereal/ayanamsa) you already plan to use.
+ *    - Or your own API route that calls Swiss Ephemeris (server-only) and returns sidereal longitudes.
+ * 4) Set your preferred ayanamsa (default here: Lahiri ~ 24°). Adjust as needed.
+ */
+
+// 12 sidereal signs ordered from 0° Aries → 360°.
+const SIGNS = [
+  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+] as const;
+
+// Short labels for compact mobile UI
+const SIGN_SHORT: Record<string, string> = {
+  Aries: "Ar",
+  Taurus: "Ta",
+  Gemini: "Ge",
+  Cancer: "Cn",
+  Leo: "Le",
+  Virgo: "Vi",
+  Libra: "Li",
+  Scorpio: "Sc",
+  Sagittarius: "Sg",
+  Capricorn: "Cp",
+  Aquarius: "Aq",
+  Pisces: "Pi",
+};
+
+// Planets we’ll display
+const PLANETS = [
+  "Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn","Rahu","Ketu",
+] as const;
+
+type Planet = typeof PLANETS[number];
+
+// Vedic special aspects (sign-based, whole-house drishti) by offset in SIGNS from the planet’s sign
+// e.g., for Mars: +3 (4th), +6 (7th), +7 (8th) — all measured in signs (30° each)
+const DRISHTI_RULES: Record<Planet, number[]> = {
+  Sun: [6],
+  Moon: [6],
+  Mercury: [6],
+  Venus: [6],
+  Mars: [3, 6, 7],
+  Jupiter: [4, 6, 8],
+  Saturn: [2, 6, 9],
+  Rahu: [4, 6, 8],
+  Ketu: [4, 6, 8],
+};
+
+// —— Utilities —— //
+function mod360(x: number) { return ((x % 360) + 360) % 360; }
+function clampDeg(deg: number) { return mod360(deg); }
+
+function longToSignIndex(longitude: number) {
+  // 0°–29.999° Aries = 0, 30°–59.999° Taurus = 1, ...
+  return Math.floor(clampDeg(longitude) / 30);
+}
+
+function longToSignDegree(longitude: number) {
+  const signIdx = longToSignIndex(longitude);
+  const degreeInSign = clampDeg(longitude) - signIdx * 30;
+  const deg = Math.floor(degreeInSign);
+  const min = Math.round((degreeInSign - deg) * 60);
+  return { signIdx, sign: SIGNS[signIdx], degreeInSign, deg, min };
+}
+
+function fmtDeg(deg: number) {
+  const d = Math.floor(deg);
+  const m = Math.round((deg - d) * 60);
+  return `${d}°${m ? String(m).padStart(2, "0") : ""}`;
+}
+
+function toSignDegString(longitude: number) {
+  const { sign, degreeInSign } = longToSignDegree(longitude);
+  return `${fmtDeg(degreeInSign)} ${sign}`;
+}
+
+function rangeToHuman(startLong: number, endLong: number) {
+  // Express as “X° Sign → Y° NextSignMinus1°” (exclusive end)
+  const start = longToSignDegree(startLong);
+  const end = longToSignDegree(mod360(endLong - 1e-6)); // make exclusive look inclusive visually
+  return `${fmtDeg(start.degreeInSign)} ${start.sign} → ${fmtDeg(end.degreeInSign)} ${end.sign}`;
+}
+
+// —— Demo/placeholder sidereal positions —— //
+/**
+ * Replace this with a real API call that returns *sidereal* longitudes (0–360) for each planet.
+ * You can implement /app/api/positions/route.ts that calls Prokerala API with your ayanamsa.
+ */
+async function fetchPositions(): Promise<Record<Planet, number>> {
+  // Placeholder demo: Mars at 19° Virgo as per your example
+  // (Virgo starts at 150°, so 150° + 19° = 169° ecliptic longitude)
+  // Other planets are mocked.
+  return {
+    Sun: 132.2,      // 12.2° Leo (mock)
+    Moon: 5.5,       // 5.5° Aries (mock)
+    Mars: 150 + 19,  // 19° Virgo (your example)
+    Mercury: 175.3,  // 25.3° Virgo (mock)
+    Jupiter: 64.8,   // 4.8° Gemini (mock)
+    Venus: 198.4,    // 18.4° Libra (mock)
+    Saturn: 327.0,   // 27° Aquarius (mock)
+    Rahu: 24.2,      // 24.2° Aries (mock)
+    Ketu: 204.2,     // 24.2° Libra (opposite) (mock)
+  };
+}
+
+// If your API returns tropical longitudes, convert using ayanamsa (e.g., Lahiri ~ 24°)
+function tropicalToSidereal(tropicalLong: number, ayanamsaDeg = 24.0) {
+  return mod360(tropicalLong - ayanamsaDeg);
+}
+
+// Compute 30° drishti arc ranges for a planet, from its exact degree anchor in the target house
+function computeDrishtiArcs(planet: Planet, positions: Record<Planet, number>) {
+  const long = positions[planet];
+  const signIdx = longToSignIndex(long);
+  const degreeInSign = long - signIdx * 30; // 0–30 anchor degree
+  const offsets = DRISHTI_RULES[planet] || [];
+
+  // Each offset is measured in signs from the planet’s current sign.
+  // Start of aspect arc = same degree in the target sign; end = +30° (exclusive)
+  return offsets.map((offset) => {
+    const targetSignIdx = (signIdx + offset) % 12;
+    const startLong = targetSignIdx * 30 + degreeInSign; // same degree in target sign
+    const endLong = startLong + 30; // 30° arc of that house/sign
+    return {
+      startLong: mod360(startLong),
+      endLong: mod360(endLong),
+      startLabel: toSignDegString(startLong),
+      endLabel: toSignDegString(mod360(endLong - 1e-6)), // exclusive end, show nicely
+      signsCovered: [SIGNS[targetSignIdx], SIGNS[(targetSignIdx + 1) % 12]],
+    };
+  });
+}
+
+function PlanetPill({ name, selected, onClick }: { name: Planet; selected: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-2 rounded-full text-sm font-medium border transition active:scale-[.98] ${
+        selected ? "bg-black text-white" : "bg-white text-gray-900 border-gray-300"
+      }`}>
+      {name}
+    </button>
+  );
+}
+
+function SignCell({ sign, children }: { sign: typeof SIGNS[number]; children?: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-gray-200 p-3 flex flex-col gap-2 bg-white shadow-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold text-gray-900">{sign}</span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{SIGN_SHORT[sign]}</span>
+      </div>
+      <div className="flex flex-wrap gap-1 min-h-6">{children}</div>
+    </div>
+  );
+}
+
+function PlanetBadge({ p, long }: { p: Planet; long: number }) {
+  const { degreeInSign, sign } = longToSignDegree(long);
+  return (
+    <div className="text-[11px] px-2 py-1 bg-gray-50 border border-gray-200 rounded-full">
+      <span className="font-semibold mr-1">{p}</span>
+      <span className="text-gray-700">{fmtDeg(degreeInSign)} {sign}</span>
+    </div>
+  );
+}
+
+function RangeChip({ text }: { text: string }) {
+  return (
+    <div className="text-[12px] px-2 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 whitespace-nowrap">
+      {text}
+    </div>
+  );
+}
+
+export default function RashiDrishti() {
+  const [positions, setPositions] = useState<Record<Planet, number> | null>(null);
+  const [selectedPlanet, setSelectedPlanet] = useState<Planet>("Mars");
+  const [ayanamsaDeg, setAyanamsaDeg] = useState<number>(24.0);
+
+  useEffect(() => {
+    (async () => {
+      const pos = await fetchPositions();
+      setPositions(pos);
+    })();
+  }, []);
+
+  const drishtiArcs = useMemo(() => {
+    if (!positions) return [] as ReturnType<typeof computeDrishtiArcs>;
+    return computeDrishtiArcs(selectedPlanet, positions);
+  }, [positions, selectedPlanet]);
+
+  // Map planets into their sign buckets for the grid
+  const signBuckets = useMemo(() => {
+    const buckets: Record<string, Array<{ p: Planet; long: number }>> = {};
+    SIGNS.forEach((s) => (buckets[s] = []));
+    if (positions) {
+      PLANETS.forEach((p) => {
+        const long = positions[p];
+        const { sign } = longToSignDegree(long);
+        buckets[sign].push({ p, long });
+      });
+    }
+    return buckets;
+  }, [positions]);
+
+  return (
+    <main className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
+      <div className="mx-auto max-w-md p-4 flex flex-col gap-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">Rashi Chart (Sidereal)</h1>
+          <span className="text-xs text-gray-600">Mobile UI</span>
+        </div>
+
+        {/* Planet selector */}
+        <div className="flex flex-wrap gap-2">
+          {PLANETS.map((p) => (
+            <PlanetPill key={p} name={p} selected={p === selectedPlanet} onClick={() => setSelectedPlanet(p)} />
+          ))}
+        </div>
+
+        {/* Ayanamsa quick-tune */}
+        <div className="flex items-center gap-2 text-sm">
+          <label className="text-gray-700 font-medium">Ayanamsa</label>
+          <input
+            type="number"
+            step="0.1"
+            value={ayanamsaDeg}
+            onChange={(e) => setAyanamsaDeg(parseFloat(e.target.value || "0"))}
+            className="w-20 border rounded-lg px-2 py-1 text-right"
+          />
+          <span className="text-gray-500">° (used if converting tropical → sidereal)</span>
+        </div>
+
+        {/* Drishti ranges panel */}
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
+          <div className="text-sm font-semibold mb-2">{selectedPlanet} Drishti (whole-sign house spans)</div>
+          {!positions ? (
+            <div className="text-sm text-gray-600">Loading positions…</div>
+          ) : drishtiArcs.length === 0 ? (
+            <div className="text-sm text-gray-600">No special drishti for {selectedPlanet} (only 7th aspect).</div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {drishtiArcs.map((arc, i) => (
+                <RangeChip key={i} text={`${rangeToHuman(arc.startLong, arc.endLong)}`} />
+              ))}
+            </div>
+          )}
+
+          {/* Example note matching your Mars @ 19° Virgo description */}
+          {positions && selectedPlanet === "Mars" && (
+            <p className="mt-2 text-xs text-amber-900">
+              Example (Mars at {toSignDegString(positions.Mars)}): 4th, 7th, 8th house spans are highlighted as
+              30° arcs starting from the same degree in the target sign, e.g. “19° Sagittarius → 18° Capricorn”,
+              “19° Pisces → 18° Aries”, “19° Aries → 18° Taurus”.
+            </p>
+          )}
+        </div>
+
+        {/* Rashi grid (4 × 3) */}
+        <div className="grid grid-cols-3 gap-2">
+          {SIGNS.map((sign) => (
+            <SignCell key={sign} sign={sign}>
+              {signBuckets[sign].map(({ p, long }) => (
+                <PlanetBadge key={p} p={p} long={long} />
+              ))}
+            </SignCell>
+          ))}
+        </div>
+
+        {/* Implementation notes */}
+        <details className="mt-2 text-xs text-gray-600">
+          <summary className="cursor-pointer font-semibold text-gray-800">Implementation notes & API wiring</summary>
+          <ul className="list-disc pl-5 space-y-1 mt-1">
+            <li>
+              Replace <code>fetchPositions()</code> with a real endpoint returning <code>{`{ planet: siderealLongitudeDeg }`}</code>.
+              For Prokerala, request sidereal positions with your chosen ayanamsa (e.g., Lahiri).
+            </li>
+            <li>
+              If your upstream is tropical, convert via <code>tropicalToSidereal(tropical, ayanamsaDeg)</code> before rendering.
+            </li>
+            <li>
+              Drishti rules are sign-offsets: Mars (+3,+6,+7), Jupiter (+4,+6,+8), Saturn (+2,+6,+9), Sun/Moon/Mercury/Venus (+6), Rahu/Ketu (+4,+6,+8).
+            </li>
+            <li>
+              The grid is mobile-first (max-w-md). For desktop, wrap in a wider container and add a circular chart later if desired.
+            </li>
+          </ul>
+        </details>
+      </div>
+    </main>
+  );
+}
