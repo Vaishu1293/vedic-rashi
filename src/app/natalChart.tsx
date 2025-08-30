@@ -9,16 +9,16 @@ const ALL_DRISHTI_PLANETS = ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Sa
 const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
   const [ascSign] = useState<number>(4); // Leo
   const [placements, setPlacements] = useState<Placement[]>([
-    { planet: "Asc", sign: 4 },
-    { planet: "Sun", sign: 2, deg: 15 },  // Gemini 15° (for testing)
-    { planet: "Moon", sign: 8, deg: 10 },
-    { planet: "Mars", sign: 6, deg: 7 },
-    { planet: "Mercury", sign: 4, deg: 5, retro: true },
-    { planet: "Jupiter", sign: 8, deg: 15 },
-    { planet: "Venus", sign: 5, deg: 12 },
-    { planet: "Saturn", sign: 10, deg: 2, retro: true },
-    { planet: "Rahu", sign: 1, deg: 20 },
-    { planet: "Ketu", sign: 7, deg: 20 },
+    { planet: "Asc", sign: 2 },
+    { planet: "Sun", sign: 10, deg: 28 },  // Gemini 15° (for testing)
+    { planet: "Moon", sign: 6, deg: 22 },
+    { planet: "Mars", sign: 2, deg: 18 },
+    { planet: "Mercury", sign: 10, deg: 22, retro: true },
+    { planet: "Jupiter", sign: 5, deg: 18 },
+    { planet: "Venus", sign: 11, deg: 26 },
+    { planet: "Saturn", sign: 10, deg: 0, retro: true },
+    { planet: "Rahu", sign: 7, deg: 22 },
+    { planet: "Ketu", sign: 1, deg: 22 },
   ]);
 
   // (optional) one-time tiny shuffle like your demo
@@ -36,7 +36,7 @@ const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
 
   const availableDrishtiPlanets = useMemo(
     () => ALL_DRISHTI_PLANETS.filter(pl =>
-      placements.some(p => p.planet === pl) && (DRISHTI_OFFSETS as any)[pl]
+      placements.some(p => p.planet === pl) && (DRISHTI_OFFSETS)[pl]
     ),
     [placements]
   );
@@ -66,7 +66,7 @@ const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
                 className={`px-2 py-1 rounded-full text-xs border transition active:scale-95 ${
                   selected === p ? "bg-white text-black" : "bg-transparent text-white/80 border-white/20"
                 }`}
-                style={{ borderColor: selected === p ? "transparent" : P_COLOR[p as any], color: selected === p ? undefined : P_COLOR[p as any] }}
+                style={{ borderColor: selected === p ? "transparent" : P_COLOR[p], color: selected === p ? undefined : P_COLOR[p] }}
               >
                 {p}
               </button>
@@ -85,7 +85,8 @@ const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
           placements={placements}
           size={560}
           selectedPlanet={showAllAspects ? null : selected}
-          highlightPlanets={showAllAspects ? (availableDrishtiPlanets as any) : []}
+          highlightPlanets={showAllAspects ? (availableDrishtiPlanets) : []}
+          showAllAspects={showAllAspects}
         />
       </div>
 
@@ -95,7 +96,7 @@ const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
           <span className="opacity-80">Legend:</span>
           {availableDrishtiPlanets.map(p => (
             <span key={`legend-${p}`} className="inline-flex items-center gap-1">
-              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: P_COLOR[p as any] }} />
+              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: P_COLOR[p] }} />
               {p}
             </span>
           ))}
