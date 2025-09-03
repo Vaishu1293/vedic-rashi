@@ -11,7 +11,7 @@ const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
   const [ascSign] = useState<number>(4); // Leo
 
   const [placements, setPlacements] = useState<Placement[]>([
-    { planet: "Asc", sign: 2, deg: 0 },     // Asc in Leo (H1 at Leo)
+    { planet: "Asc", sign: 2, deg: 10 },     // Asc in Leo (H1 at Leo)
     { planet: "Sun", sign: 10, deg: 28 },    // Aquarius 28°
     { planet: "Moon", sign: 6, deg: 22 },    // Libra 22°
     { planet: "Mars", sign: 2, deg: 18 },    // Gemini 18°
