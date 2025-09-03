@@ -7,12 +7,14 @@ interface NatalChartProps { title: string; }
 const ALL_DRISHTI_PLANETS = ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn","Rahu","Ketu"] as const;
 
 const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
+  // fallback asc sign (used only if no Asc placement is provided)
   const [ascSign] = useState<number>(4); // Leo
+
   const [placements, setPlacements] = useState<Placement[]>([
-    { planet: "Asc", sign: 2 },
-    { planet: "Sun", sign: 10, deg: 28 },  // Gemini 15° (for testing)
-    { planet: "Moon", sign: 6, deg: 22 },
-    { planet: "Mars", sign: 2, deg: 18 },
+    { planet: "Asc", sign: 2, deg: 0 },     // Asc in Leo (H1 at Leo)
+    { planet: "Sun", sign: 10, deg: 28 },    // Aquarius 28°
+    { planet: "Moon", sign: 6, deg: 22 },    // Libra 22°
+    { planet: "Mars", sign: 2, deg: 18 },    // Gemini 18°
     { planet: "Mercury", sign: 10, deg: 22, retro: true },
     { planet: "Jupiter", sign: 5, deg: 18 },
     { planet: "Venus", sign: 11, deg: 26 },
@@ -21,12 +23,8 @@ const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
     { planet: "Ketu", sign: 1, deg: 22 },
   ]);
 
-  // (optional) one-time tiny shuffle like your demo
   useEffect(() => {
-    setPlacements(prev => prev.map(p => ({
-      ...p,
-      sign: Math.random() < 0.0 ? ((p.sign + 1) % 12) : p.sign, // disabled randomness here
-    })));
+    setPlacements(prev => prev); // keep deterministic for now
   }, []);
 
   const timestamp = useMemo(() => new Date().toLocaleString(), []);
@@ -81,11 +79,11 @@ const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
       {/* Chart */}
       <div className="p-3 md:p-4 bg-[#0c1233]">
         <CircularRashiChart
-          ascSign={ascSign}
+          ascSign={ascSign}                         // fallback only; H1 comes from Asc placement
           placements={placements}
           size={560}
           selectedPlanet={showAllAspects ? null : selected}
-          highlightPlanets={showAllAspects ? (availableDrishtiPlanets) : []}
+          highlightPlanets={showAllAspects ? availableDrishtiPlanets : []}
           showAllAspects={showAllAspects}
         />
       </div>
@@ -93,14 +91,14 @@ const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
       {/* Legend */}
       {showAllAspects && (
         <div className="px-3 py-2 text-xs flex flex-wrap items-center gap-3 border-t border-white/10 bg-[#0c1233]">
-          <span className="opacity-80">Legend:</span>
+          <span className="opacity-80">Legend (outline-only):</span>
           {availableDrishtiPlanets.map(p => (
             <span key={`legend-${p}`} className="inline-flex items-center gap-1">
               <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: P_COLOR[p] }} />
               {p}
             </span>
           ))}
-          <span className="opacity-60 ml-auto">Bright = first 15° in target; faded = remainder/continuation into next sign.</span>
+          <span className="opacity-60 ml-auto">In single-planet mode, the first 15° is bright; remainder fades.</span>
         </div>
       )}
     </div>
