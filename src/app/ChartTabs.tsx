@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import NatalChart from "./natalChart";
+import NatalChart from "./charts/natalChart";
 
 
 type TabKey = "natal" | "bhava" | "transit" | "dasha";
