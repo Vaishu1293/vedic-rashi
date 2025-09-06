@@ -1,6 +1,10 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import CircularRashiChart, { Placement, DRISHTI_OFFSETS, P_COLOR } from "./circularRashiChart";
+import NatalControls from "./natalControls";
+import ChartLegend from "./ChartLegend";
+import DetailsPanel from "./DetailsPanel";
+import InsightsPanel from "./InsightsPanel";
 
 interface NatalChartProps { title: string; }
 
@@ -60,57 +64,14 @@ export default function NatalChart({ title }: NatalChartProps) {
       <div className="bg-[#0c1233] grid grid-cols-1 md:grid-cols-12 gap-0">
         {/* LEFT: Controls + Chart */}
         <div className="md:col-span-7 border-b md:border-b-0 md:border-r border-white/10">
-
-          {/* Controls (updated) */}
-          <div className="px-3 py-3 border-b border-white/10 space-y-2 bg-[#0c1233]">
-            {/* Row 1: Show aspects (left) + Clear (right) */}
-            <div className="flex items-center justify-between gap-2">
-              <button
-                onClick={() => setShowAllAspects(v => !v)}
-                className={`px-3 py-1.5 rounded text-xs border ${
-                  showAllAspects
-                    ? "bg-white text-black border-transparent"
-                    : "bg-transparent text-white/80 border-white/20"
-                }`}
-              >
-                {showAllAspects ? "Hide all aspects" : "Show all aspects"}
-              </button>
-
-              <button
-                onClick={() => setSelected(null)}
-                className="px-2 py-1 rounded text-xs bg-white/10 hover:bg-white/20 border border-white/10 transition"
-              >
-                Clear
-              </button>
-            </div>
-
-            {/* Row 2: Individual planet highlight buttons */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* <span className="text-xs opacity-80">Highlight planet:</span> */}
-              {availableDrishtiPlanets.map((p) => {
-                const isActive = selected === p && !showAllAspects;
-                return (
-                  <button
-                    key={p}
-                    onClick={() => !showAllAspects && setSelected(cur => cur === p ? null : p)}
-                    className={`px-2 py-1 rounded-full text-xs border transition active:scale-95 ${
-                      isActive
-                        ? "bg-white text-black border-transparent"
-                        : "bg-transparent text-white/80 border-white/20"
-                    } ${showAllAspects ? "opacity-50 cursor-not-allowed" : ""}`}
-                    style={{
-                      borderColor: isActive || showAllAspects ? undefined : P_COLOR[p],
-                      color: isActive || showAllAspects ? undefined : P_COLOR[p],
-                    }}
-                    aria-disabled={showAllAspects}
-                    title={showAllAspects ? "Disabled while 'Show all aspects' is on" : `Highlight ${p}`}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <NatalControls
+            showAllAspects={showAllAspects}
+            setShowAllAspects={setShowAllAspects}
+            selected={selected}
+            setSelected={setSelected}
+            availableDrishtiPlanets={availableDrishtiPlanets as unknown as string[]}
+            P_COLOR={P_COLOR}
+          />
 
           {/* Chart area */}
           <div className="p-3 md:p-4 flex items-center justify-center">
@@ -124,89 +85,37 @@ export default function NatalChart({ title }: NatalChartProps) {
             />
           </div>
 
-          {/* Legend (only for show-all) */}
-          {showAllAspects && (
-            <div className="px-3 py-2 text-xs flex flex-wrap items-center gap-3 border-t border-white/10">
-              <span className="opacity-80">Legend (outline-only):</span>
-              {availableDrishtiPlanets.map(p => (
-                <span key={`legend-${p}`} className="inline-flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: P_COLOR[p] }} />
-                  {p}
-                </span>
-              ))}
-              <span className="opacity-60 ml-auto">
-                In single-planet mode, the first 15° is bright; remainder fades (Moon spans 30°).
-              </span>
-            </div>
-          )}
+          <ChartLegend
+            show={showAllAspects}
+            availableDrishtiPlanets={availableDrishtiPlanets as unknown as string[]}
+            P_COLOR={P_COLOR}
+          />
         </div>
 
         {/* RIGHT: Explanations / Details */}
         <div className="md:col-span-5">
           <div className="p-4 md:p-5 text-white/90">
-            <div className="rounded-lg border border-white/10 p-4 bg-[#0b163b]">
-              <h3 className="text-base font-semibold mb-3">Chart Details</h3>
-
-              <div className="grid gap-4">
-                {/* Houses & Asc */}
-                <div className="rounded-md border border-white/10 p-3">
-                  <div className="text-sm opacity-80 mb-2">
-                    <span className="font-semibold">Ascendant</span>: {SIGN_NAMES[ascSignEff]} (H1)
-                  </div>
-                  <div className="text-xs opacity-80 mb-2">House mapping from Asc (H1):</div>
-                  <ol className="text-xs space-y-1">
-                    {Array.from({ length: 12 }).map((_, si) => (
-                      <li key={si} className="flex items-center gap-2">
-                        <span className="w-8 opacity-70">H{houseOf(si)}</span>
-                        <span className="opacity-90">{SIGN_NAMES[si]}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-
-                {/* Placements by degree/house */}
-                <div className="rounded-md border border-white/10 p-3">
-                  <div className="text-xs opacity-80 mb-2">Planetary placements (by degree & house):</div>
-                  <ul className="text-xs space-y-1">
-                    {placements.map((p, idx) => (
-                      <li key={`${p.planet}-${idx}`} className="flex items-center gap-2">
-                        <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: P_COLOR[p.planet] }} />
-                        <span className="font-semibold" style={{ color: P_COLOR[p.planet] }}>{p.planet}</span>
-                        <span className="opacity-85">{SIGN_NAMES[p.sign]}</span>
-                        <span className="opacity-70">{(p.deg ?? 0).toFixed(1)}°</span>
-                        <span className="opacity-70">• H{houseOf(p.sign)}</span>
-                        {p.retro && <span className="opacity-70">℞</span>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Rendering notes */}
-                <div className="rounded-md border border-white/10 p-3 text-xs leading-relaxed">
-                  <div className="font-semibold mb-1">How the aspect “vision band” is drawn</div>
-                  <ul className="list-disc pl-5 space-y-1 opacity-90">
-                    <li>
-                      Aspects start at the same degree as the source planet in the target sign.
-                      Default span is <b>15°</b>; for <b>Moon</b> it spans <b>30°</b>.
-                    </li>
-                    <li>
-                      If the span crosses a sign boundary, it continues into the next sign seamlessly (overlay ignores house borders).
-                    </li>
-                    <li>
-                      In single-planet mode, the first 15° within the span is brighter, then it fades; in “Show all aspects”
-                      mode, bands are outlines with no fill to reduce visual clutter.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* UI state summary */}
-                <div className="text-[11px] opacity-70">
-                  Mode: {showAllAspects ? "All aspects (outline only)" : (selected ? `Highlight: ${selected}` : "No highlight")}
-                </div>
-              </div>
-            </div>
+            <DetailsPanel
+              ascSignEff={ascSignEff}
+              placements={placements}
+              SIGN_NAMES={SIGN_NAMES}
+              P_COLOR={P_COLOR}
+              houseOf={houseOf}
+              uiSummary={showAllAspects ? "All aspects (outline only)" : (selected ? `Highlight: ${selected}` : "No highlight")}
+            />
           </div>
         </div>
+
+        {/* NEW: full-width analytical section */}
+        <div className="md:col-span-12">
+          <InsightsPanel
+        placements={placements}
+        ascSignEff={ascSignEff}
+        SIGN_NAMES={SIGN_NAMES}
+        P_COLOR={P_COLOR}
+      />
+        </div>
+      
       </div> {/* /grid */}
     </div>
   );
