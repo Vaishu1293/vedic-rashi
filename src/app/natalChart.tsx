@@ -77,7 +77,7 @@ const NatalChart: React.FC<NatalChartProps> = ({ title }) => {
       </div>
 
       {/* Chart */}
-      <div className="p-3 md:p-4 bg-[#0c1233]">
+      <div className="p-3 md:p-4 bg-[#0c1233] flex items-center justify-center">
         <CircularRashiChart
           ascSign={ascSign}                         // fallback only; H1 comes from Asc placement
           placements={placements}
